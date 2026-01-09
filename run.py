@@ -242,7 +242,7 @@ def exec_action_scroll(info, web_eles, driver_task, args, obs_info):
 
 def webvoyager_run(args, task, task_dir):
     # OpenAI client
-    client = OpenAI(api_key=args.api_key, http_client=httpx.Client(proxies=""))
+    client = OpenAI(api_key=args.api_key, http_client=httpx.Client(trust_env=False))
     options = driver_config(args)
     setup_logger(task_dir)
     logging.info(f'########## TASK{task["id"]} ##########')
