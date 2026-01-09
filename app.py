@@ -7,24 +7,60 @@ import threading
 import json
 import traceback
 from run import webvoyager_run
+import re
+
+def format_log_for_gradio(log_content):
+    """
+    Formats the raw log content into a more readable format for the Gradio UI.
+    """
+    # Extract the JSON part of the log
+    json_match = re.search(r'\[(\{.*?\})\]', log_content, re.DOTALL)
+    if not json_match:
+        return log_content
+
+    try:
+        log_data = json.loads(json_match.group(1))
+        formatted_output = ""
+
+        if 'role' in log_data and log_data['role'] == 'user':
+            # This is the initial prompt, let's summarize it
+            formatted_output += "--- Initial Prompt ---\n"
+            content = log_data['content'][0]['text']
+            task_match = re.search(r'Now given a task: (.*?)\s+Please interact with', content)
+            if task_match:
+                formatted_output += f"Task: {task_match.group(1)}\n\n"
+
+        elif 'role' in log_data and log_data['role'] == 'assistant':
+            # This is the agent's response
+            content = log_data['content']
+            thought_match = re.search(r'Thought: (.*?)\nAction:', content, re.DOTALL)
+            action_match = re.search(r'Action: (.*)', content, re.DOTALL)
+
+            if thought_match:
+                formatted_output += f"Thought: {thought_match.group(1).strip()}\n"
+            if action_match:
+                formatted_output += f"Action: {action_match.group(1).strip()}\n"
+
+        return formatted_output
+
+    except json.JSONDecodeError:
+        return log_content # Return raw log if JSON parsing fails
+
 
 def run_script_for_gradio(url, task):
     """
-    A wrapper to run the webvoyager script for Gradio, capturing output.
+    A wrapper to run the webvoyager script for Gradio, capturing output and screenshots.
     """
-    # Create a temporary directory for this run
     with tempfile.TemporaryDirectory() as temp_dir:
-        # Create a temporary file for the task
         task_file_path = os.path.join(temp_dir, 'task.jsonl')
         with open(task_file_path, 'w') as f:
             f.write(f'{{"id": "custom_task", "web": "{url}", "ques": "{task}"}}')
 
-        # Setup arguments
         args = argparse.Namespace(
             test_file=task_file_path,
             max_iter=5,
             api_key=os.environ.get("OPENAI_API_KEY", "YOUR_OPENAI_API_KEY"),
-            api_model="gpt-4-vision-preview",
+            api_model="gpt-4-turbo",
             output_dir=os.path.join(temp_dir, 'results'),
             seed=None,
             max_attached_imgs=1,
@@ -39,50 +75,31 @@ def run_script_for_gradio(url, task):
             fix_box_color=False
         )
 
-        # Create necessary directories
         os.makedirs(args.output_dir, exist_ok=True)
         os.makedirs(args.download_dir, exist_ok=True)
 
-        # Capture stdout
-        original_stdout = sys.stdout
-        sys.stdout = captured_output = threading.local()
-        captured_output.value = ""
+        task_dir = os.path.join(args.output_dir, 'taskcustom_task')
+        os.makedirs(task_dir, exist_ok=True)
 
-        def stream_catcher():
-            while True:
-                try:
-                    # This is a bit of a hack to get real-time output
-                    # A better solution would be to modify the logger to write to a queue
-                    with open(os.path.join(args.output_dir, 'taskcustom_task', 'agent.log'), 'r') as f:
-                        captured_output.value = f.read()
-                except FileNotFoundError:
-                    pass # Log file might not be created yet
-
-        stream_thread = threading.Thread(target=stream_catcher)
-        stream_thread.daemon = True
-        stream_thread.start()
-
-        output = ""
+        full_log = ""
         try:
-            with open(task_file_path, 'r', encoding='utf-8') as f:
-                task_data = [json.loads(line) for line in f]
+            # We'll get real-time updates by iterating through the run function
+            for i, log_entry in enumerate(webvoyager_run(args, {"id": "custom_task", "web": url, "ques": task}, task_dir)):
 
-            for task_item in task_data:
-                task_dir = os.path.join(args.output_dir, f'task{task_item["id"]}')
-                os.makedirs(task_dir, exist_ok=True)
-                webvoyager_run(args, task_item, task_dir)
+                formatted_log = format_log_for_gradio(log_entry)
+                if formatted_log:
+                    full_log += f"--- Step {i+1} ---\n{formatted_log}\n"
 
-                # Read the final log
-                with open(os.path.join(task_dir, 'agent.log'), 'r') as f:
-                    output = f.read()
-                yield output
+                screenshot_path = os.path.join(task_dir, f'screenshot{i+1}.png')
+                if os.path.exists(screenshot_path):
+                    yield screenshot_path, full_log
+                else:
+                    yield None, full_log
 
         except Exception as e:
             tb = traceback.format_exc()
-            output = f"An error occurred: {e}\n\nFull Traceback:\n{tb}"
-            yield output
-        finally:
-            sys.stdout = original_stdout
+            full_log += f"An error occurred: {e}\n\nFull Traceback:\n{tb}"
+            yield None, full_log
 
 
 iface = gr.Interface(
@@ -91,7 +108,10 @@ iface = gr.Interface(
         gr.Textbox(label="URL", placeholder="Enter the URL of the website"),
         gr.Textbox(label="Task", placeholder="Describe the task to perform"),
     ],
-    outputs=gr.Textbox(label="Agent Output", lines=20, interactive=False),
+    outputs=[
+        gr.Image(label="Agent's View", type="filepath"),
+        gr.Textbox(label="Agent Output", lines=20, interactive=False),
+    ],
     title="WebVoyager",
     description="An LMM-powered web agent that can complete user instructions end-to-end.",
 )
