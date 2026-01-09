@@ -12,6 +12,14 @@ app_file: app.py
 
 This is a Gradio demo of the WebVoyager agent, which can complete user instructions end-to-end by interacting with real-world websites.
 
+## Setup
+
+To use this space, you must set your OpenAI API key as a secret.
+
+1.  Go to the "Settings" tab of this space.
+2.  Scroll down to the "Secrets" section.
+3.  Click on "New secret" and add your `OPENAI_API_KEY`.
+
 ## How to use
 
 1.  Enter the URL of the website you want the agent to interact with.

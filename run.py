@@ -14,6 +14,7 @@ from selenium.webdriver.common.action_chains import ActionChains
 
 from prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_TEXT_ONLY
 from openai import OpenAI
+import httpx
 from utils import get_web_element_rect, encode_image, extract_information, print_message,\
     get_webarena_accessibility_tree, get_pdf_retrieval_ans_from_assistant, clip_message_and_obs, clip_message_and_obs_text_only
 
@@ -241,7 +242,7 @@ def exec_action_scroll(info, web_eles, driver_task, args, obs_info):
 
 def webvoyager_run(args, task, task_dir):
     # OpenAI client
-    client = OpenAI(api_key=args.api_key)
+    client = OpenAI(api_key=args.api_key, http_client=httpx.Client(proxies=""))
     options = driver_config(args)
     setup_logger(task_dir)
     logging.info(f'########## TASK{task["id"]} ##########')

@@ -5,6 +5,7 @@ import sys
 import tempfile
 import threading
 import json
+import traceback
 from run import webvoyager_run
 
 def run_script_for_gradio(url, task):
@@ -77,7 +78,8 @@ def run_script_for_gradio(url, task):
                 yield output
 
         except Exception as e:
-            output = f"An error occurred: {e}"
+            tb = traceback.format_exc()
+            output = f"An error occurred: {e}\n\nFull Traceback:\n{tb}"
             yield output
         finally:
             sys.stdout = original_stdout
