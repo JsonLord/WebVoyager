@@ -1,0 +1,4 @@
+HF_PROFILE_ID=AUXteam
+HF_SPACE_NAME=AUXteam/webvoyager_tinytroupe
+HF_SDK=gradio
+HF_DEPLOY_ENABLED=True
