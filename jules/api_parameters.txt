@@ -1,63 +1,40 @@
-```python
-# Hugging Face Data Configuration
-HF_NAMESPACE = "your-namespace-here"
-HF_PROFILE = "your-profile-here"
-HF_TOKEN = "your-hf-token-here"
+$ pip install gradio_client
+2. Find the API endpoint below corresponding to your desired function in the app. Copy the code snippet, replacing the placeholder values with your own input data. If this is a private Space, you may need to pass your Hugging Face token as well (read more). Or use the
+API Recorder
 
-# API List Overview
-API_ENDPOINTS = {
-    "model_inference": "/api/inference",
-    "data_processing": "/api/processing",
-    "model_training": "/api/training",
-    "dataset_management": "/api/datasets"
-}
+to automatically generate your API requests.
 
-# External Services API Documentation
-EXTERNAL_SERVICES = {
-    "gradio": {
-        "base_url": "https://gradio.app/api",
-        "documentation": "https://gradio.app/docs",
-        "endpoints": {
-            "interface_creation": "/create_interface",
-            "component_api": "/components",
-            "theme_management": "/themes"
-        }
-    },
-    "huggingface_hub": {
-        "base_url": "https://huggingface.co/api",
-        "documentation": "https://huggingface.co/docs/hub",
-        "endpoints": {
-            "model_list": "/models",
-            "dataset_list": "/datasets",
-            "space_list": "/spaces"
-        }
-    }
-}
+API name: /generate_personas Generates a list of TinyPerson instances based on the provided inputs. It prioritizes the API key passed as an argument, but falls back to the environment variable if none is provided (for UI use).
 
-# Gradio Integration Configuration
-GRADIO_CONFIG = {
-    "app_name": "huggingface-gradio-app",
-    "version": "1.0.0",
-    "supported_components": ["text", "image", "audio", "video"],
-    "deployment_options": ["local", "cloud", "huggingface_spaces"]
-}
+from gradio_client import Client
 
-# Project Structure
-PROJECT_STRUCTURE = {
-    "src": {
-        "main.py": "Primary application entry point",
-        "config.py": "Configuration management",
-        "api_client.py": "External service API clients",
-        "gradio_interface.py": "Gradio interface implementation"
-    },
-    "data": {
-        "models": "Pre-trained model files",
-        "datasets": "Training and validation datasets",
-        "cache": "Temporary storage"
-    },
-    "docs": {
-        "api_docs.md": "API documentation",
-        "setup_guide.md": "Installation and setup guide"
-    }
-}
-```
+client = Client("harvesthealth/tiny_factory")
+result = client.predict(
+business_description="Hello!!",
+customer_profile="Hello!!",
+num_personas=1,
+blablador_api_key=None,
+api_name="/generate_personas"
+)
+print(result)
+Accepts 4 parameters:
+business_description str Required
+
+The input value that is provided in the "What is your business about?" Textbox component.
+
+customer_profile str Required
+
+The input value that is provided in the "Information about your customer profile" Textbox component.
+
+num_personas float Default:1
+
+The input value that is provided in the "Number of personas to generate" Number component.
+
+blablador_api_key str | None Default:None
+
+The input value that is provided in the "Blablador API Key (for API client use)" Textbox component.
+
+Returns 1 element
+str | float | bool | list | dict
+
+The output value that appears in the "Generated Personas" Json component
