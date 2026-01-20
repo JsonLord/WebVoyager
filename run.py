@@ -165,7 +165,7 @@ def call_gpt4v_api(args, openai_client, messages):
 def exec_action_click(info, web_ele, driver_task):
     driver_task.execute_script("arguments[0].setAttribute('target', '_self')", web_ele)
     web_ele.click()
-    time.sleep(2)
+    time.sleep(3)
 
 
 def exec_action_type(info, web_ele, driver_task):
@@ -230,10 +230,31 @@ def exec_action_scroll(info, web_eles, driver_task, args, obs_info):
             actions.key_down(Keys.ALT).send_keys(Keys.ARROW_DOWN).key_up(Keys.ALT).perform()
         else:
             actions.key_down(Keys.ALT).send_keys(Keys.ARROW_UP).key_up(Keys.ALT).perform()
-    time.sleep(2)
+    time.sleep(3)
 
 
-def webvoyager_run(args, task, task_dir):
+def main():
+    parser = argparse.ArgumentParser()
+    parser.add_argument('--test_file', type=str, default='data/test.json')
+    parser.add_argument('--max_iter', type=int, default=5)
+    parser.add_argument("--api_key", default="key", type=str, help="YOUR_OPENAI_API_KEY")
+    parser.add_argument("--api_model", default="gpt-4-vision-preview", type=str, help="api model name")
+    parser.add_argument("--output_dir", type=str, default='results')
+    parser.add_argument("--seed", type=int, default=None)
+    parser.add_argument("--max_attached_imgs", type=int, default=1)
+    parser.add_argument("--temperature", type=float, default=1.0)
+    parser.add_argument("--download_dir", type=str, default="downloads")
+    parser.add_argument("--text_only", action='store_true')
+    # for web browser
+    parser.add_argument("--headless", action='store_true', help='The window of selenium')
+    parser.add_argument("--save_accessibility_tree", action='store_true')
+    parser.add_argument("--force_device_scale", action='store_true')
+    parser.add_argument("--window_width", type=int, default=1024)
+    parser.add_argument("--window_height", type=int, default=768)  # for headless mode, there is no address bar
+    parser.add_argument("--fix_box_color", action='store_true')
+
+    args = parser.parse_args()
+
     # OpenAI client
     client = OpenAI(api_key=args.api_key)
 
@@ -244,19 +265,30 @@ def webvoyager_run(args, task, task_dir):
     result_dir = os.path.join(args.output_dir, current_time)
     os.makedirs(result_dir, exist_ok=True)
 
-    setup_logger(task_dir)
-    logging.info(f'########## TASK{task["id"]} ##########')
+    # Load tasks
+    tasks = []
+    with open(args.test_file, 'r', encoding='utf-8') as f:
+        for line in f:
+            tasks.append(json.loads(line))
 
-    driver_task = webdriver.Chrome(options=options)
 
-    # About window size, 765 tokens
-    # You can resize to height = 512 by yourself (255 tokens, Maybe bad performance)
-    driver_task.set_window_size(args.window_width, args.window_height)  # larger height may contain more web information
-    driver_task.get(task['web'])
-    try:
-        driver_task.find_element(By.TAG_NAME, 'body').click()
-    except:
-        pass
+    for task_id in range(len(tasks)):
+        task = tasks[task_id]
+        task_dir = os.path.join(result_dir, 'task{}'.format(task["id"]))
+        os.makedirs(task_dir, exist_ok=True)
+        setup_logger(task_dir)
+        logging.info(f'########## TASK{task["id"]} ##########')
+
+        driver_task = webdriver.Chrome(options=options)
+
+        # About window size, 765 tokens
+        # You can resize to height = 512 by yourself (255 tokens, Maybe bad performance)
+        driver_task.set_window_size(args.window_width, args.window_height)  # larger height may contain more web information
+        driver_task.get(task['web'])
+        try:
+            driver_task.find_element(By.TAG_NAME, 'body').click()
+        except:
+            pass
         # sometimes enter SPACE, the page will sroll down
         driver_task.execute_script("""window.onkeydown = function(e) {if(e.keyCode == 32 && e.target.type != 'text' && e.target.type != 'textarea') {e.preventDefault();}};""")
         time.sleep(5)
@@ -288,16 +320,36 @@ def webvoyager_run(args, task, task_dir):
         accumulate_prompt_token = 0
         accumulate_completion_token = 0
 
-        # Take initial screenshot
-        img_path = os.path.join(task_dir, 'screenshot{}.png'.format(it+1))
-        driver_task.save_screenshot(img_path)
-        b64_img = encode_image(img_path)
-        rects, web_eles, web_eles_text = get_web_element_rect(driver_task, fix_color=args.fix_box_color)
-
         while it < args.max_iter:
             logging.info(f'Iter: {it}')
             it += 1
             if not fail_obs:
+                try:
+                    if not args.text_only:
+                        rects, web_eles, web_eles_text = get_web_element_rect(driver_task, fix_color=args.fix_box_color)
+                    else:
+                        accessibility_tree_path = os.path.join(task_dir, 'accessibility_tree{}'.format(it))
+                        ac_tree, obs_info = get_webarena_accessibility_tree(driver_task, accessibility_tree_path)
+
+                except Exception as e:
+                    if not args.text_only:
+                        logging.error('Driver error when adding set-of-mark.')
+                    else:
+                        logging.error('Driver error when obtaining accessibility tree.')
+                    logging.error(e)
+                    break
+
+                img_path = os.path.join(task_dir, 'screenshot{}.png'.format(it))
+                driver_task.save_screenshot(img_path)
+
+                # accessibility tree
+                if (not args.text_only) and args.save_accessibility_tree:
+                    accessibility_tree_path = os.path.join(task_dir, 'accessibility_tree{}'.format(it))
+                    get_webarena_accessibility_tree(driver_task, accessibility_tree_path)
+
+                # encode image
+                b64_img = encode_image(img_path)
+
                 # format msg
                 if not args.text_only:
                     curr_msg = format_msg(it, init_msg, pdf_obs, warn_obs, b64_img, web_eles_text)
@@ -435,11 +487,6 @@ def webvoyager_run(args, task, task_dir):
                 else:
                     raise NotImplementedError
                 fail_obs = ""
-                # Take screenshot after action
-                img_path = os.path.join(task_dir, 'screenshot{}.png'.format(it+1))
-                driver_task.save_screenshot(img_path)
-                b64_img = encode_image(img_path)
-                rects, web_eles, web_eles_text = get_web_element_rect(driver_task, fix_color=args.fix_box_color)
             except Exception as e:
                 logging.error('driver error info:')
                 logging.error(e)
@@ -452,39 +499,6 @@ def webvoyager_run(args, task, task_dir):
         print_message(messages, task_dir)
         driver_task.quit()
         logging.info(f'Total cost: {accumulate_prompt_token / 1000 * 0.01 + accumulate_completion_token / 1000 * 0.03}')
-
-
-def main():
-    parser = argparse.ArgumentParser()
-    parser.add_argument('--test_file', type=str, default='data/test.json')
-    parser.add_argument('--max_iter', type=int, default=5)
-    parser.add_argument("--api_key", default="key", type=str, help="YOUR_OPENAI_API_KEY")
-    parser.add_argument("--api_model", default="gpt-4-vision-preview", type=str, help="api model name")
-    parser.add_argument("--output_dir", type=str, default='results')
-    parser.add_argument("--seed", type=int, default=None)
-    parser.add_argument("--max_attached_imgs", type=int, default=1)
-    parser.add_argument("--temperature", type=float, default=1.0)
-    parser.add_argument("--download_dir", type=str, default="downloads")
-    parser.add_argument("--text_only", action='store_true')
-    # for web browser
-    parser.add_argument("--headless", action='store_true', help='The window of selenium')
-    parser.add_argument("--save_accessibility_tree", action='store_true')
-    parser.add_argument("--force_device_scale", action='store_true')
-    parser.add_argument("--window_width", type=int, default=1024)
-    parser.add_argument("--window_height", type=int, default=768)  # for headless mode, there is no address bar
-    parser.add_argument("--fix_box_color", action='store_true')
-    args = parser.parse_args()
-
-    # Load tasks
-    tasks = []
-    with open(args.test_file, 'r', encoding='utf-8') as f:
-        for line in f:
-            tasks.append(json.loads(line))
-
-    for task in tasks:
-        task_dir = "results/{}".format(task["id"])
-        os.makedirs(task_dir, exist_ok=True)
-        webvoyager_run(args, task, task_dir)
 
 
 if __name__ == '__main__':
