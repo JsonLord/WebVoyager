@@ -406,20 +406,34 @@ def get_pdf_retrieval_ans_from_assistant(client, pdf_path, task):
     return messages_text
 
 
+import concurrent.futures
+
 def generate_persona(business_description, customer_profile):
     if not business_description or not customer_profile:
         return None
+
+    def call_api():
+        try:
+            logging.info(f"Generating persona for business: {business_description} and customer: {customer_profile}")
+            tinytroupe_space = os.environ.get("TINYTROUPE_SPACE", "harvesthealth/tiny_factory")
+            client = Client(tinytroupe_space)
+            result = client.predict(
+                business_description=business_description,
+                customer_profile=customer_profile,
+                num_personas=1,
+                blablador_api_key=None,
+                api_name="/generate_personas"
+            )
+            return result
+        except Exception as e:
+            logging.error(f"TinyTroupe API call failed: {e}")
+            return None
+
     try:
-        logging.info(f"Generating persona for business: {business_description} and customer: {customer_profile}")
-        tinytroupe_space = os.environ.get("TINYTROUPE_SPACE", "harvesthealth/tiny_factory")
-        client = Client(tinytroupe_space)
-        result = client.predict(
-            business_description=business_description,
-            customer_profile=customer_profile,
-            num_personas=1,
-            blablador_api_key=None,
-            api_name="/generate_personas"
-        )
+        with concurrent.futures.ThreadPoolExecutor() as executor:
+            future = executor.submit(call_api)
+            # Timeout after 60 seconds
+            result = future.result(timeout=60)
 
         # Result is likely a JSON string or a list/dict
         if isinstance(result, str):
