@@ -5,6 +5,7 @@ import json
 import time
 import logging
 import numpy as np
+from gradio_client import Client
 from PIL import Image
 from utils_webarena import fetch_browser_info, fetch_page_accessibility_tree,\
                     parse_accessibility_tree, clean_accesibility_tree
@@ -403,3 +404,37 @@ def get_pdf_retrieval_ans_from_assistant(client, pdf_path, task):
     # print(assistant_deletion_status)
     logging.info(assistant_deletion_status)
     return messages_text
+
+
+def generate_persona(business_description, customer_profile):
+    if not business_description or not customer_profile:
+        return None
+    try:
+        logging.info(f"Generating persona for business: {business_description} and customer: {customer_profile}")
+        tinytroupe_space = os.environ.get("TINYTROUPE_SPACE", "harvesthealth/tiny_factory")
+        client = Client(tinytroupe_space)
+        result = client.predict(
+            business_description=business_description,
+            customer_profile=customer_profile,
+            num_personas=1,
+            blablador_api_key=None,
+            api_name="/generate_personas"
+        )
+
+        # Result is likely a JSON string or a list/dict
+        if isinstance(result, str):
+            try:
+                personas = json.loads(result)
+            except json.JSONDecodeError:
+                # If it's not valid JSON, it might be a raw string from the API
+                logging.warning(f"Failed to decode persona JSON: {result}")
+                return None
+        else:
+            personas = result
+
+        if isinstance(personas, list) and len(personas) > 0:
+            return personas[0]
+        return personas
+    except Exception as e:
+        logging.error(f"Error generating persona: {e}")
+        return None

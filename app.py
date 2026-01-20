@@ -7,6 +7,7 @@ import threading
 import json
 import traceback
 from run import webvoyager_run
+from utils import generate_persona
 import re
 
 def format_log_for_gradio(log_content):
@@ -54,10 +55,19 @@ def format_log_for_gradio(log_content):
     return formatted_output
 
 
-def run_script_for_gradio(url, task):
+def run_script_for_gradio(url, task, business_description=None, customer_profile=None):
     """
     A wrapper to run the webvoyager script for Gradio, capturing output and screenshots.
     """
+    persona = None
+    if business_description and customer_profile:
+        yield None, "Generating persona from TinyTroupe...", "", None
+        persona = generate_persona(business_description, customer_profile)
+        if persona:
+            yield None, f"Persona generated: {persona.get('name', 'Unknown')}\n", "", None
+        else:
+            yield None, "Failed to generate persona. Proceeding with default persona.\n", "", None
+
     with tempfile.TemporaryDirectory() as temp_dir:
         task_file_path = os.path.join(temp_dir, 'task.jsonl')
         with open(task_file_path, 'w') as f:
@@ -97,7 +107,7 @@ def run_script_for_gradio(url, task):
         try:
             # We'll get real-time updates by iterating through the run function
             with open(raw_log_file_path, "w") as raw_log_file:
-                for i, log_entry in enumerate(webvoyager_run(args, {"id": "custom_task", "web": url, "ques": task}, task_dir)):
+                for i, log_entry in enumerate(webvoyager_run(args, {"id": "custom_task", "web": url, "ques": task}, task_dir, persona=persona)):
                     
                     raw_log_file.write(log_entry + '\n')
                     raw_log_file.flush()
@@ -148,6 +158,8 @@ iface = gr.Interface(
     inputs=[
         gr.Textbox(label="URL", placeholder="Enter the URL of the website"),
         gr.Textbox(label="Task", placeholder="Describe the task to perform"),
+        gr.Textbox(label="Business Description (TinyTroupe)", placeholder="What is your business about?"),
+        gr.Textbox(label="Customer Profile (TinyTroupe)", placeholder="Information about your customer profile"),
     ],
     outputs=[
         gr.Image(label="Agent's View", type="filepath"),

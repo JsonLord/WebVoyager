@@ -13,7 +13,7 @@ from selenium.webdriver.common.by import By
 from selenium.webdriver.common.keys import Keys
 from selenium.webdriver.common.action_chains import ActionChains
 
-from prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_TEXT_ONLY
+from prompts import SYSTEM_PROMPT, SYSTEM_PROMPT_TEXT_ONLY, PERSONA_SYSTEM_PROMPT
 from openai import OpenAI, APIError
 import httpx
 from utils import get_web_element_rect, encode_image, extract_information, print_message,\
@@ -249,7 +249,7 @@ def exec_action_scroll(info, web_eles, driver_task, args, obs_info, task_dir, it
             logging.error(f"Error highlighting element: {e}")
 
 
-def webvoyager_run(args, task, task_dir):
+def webvoyager_run(args, task, task_dir, persona=None):
     """
     A generator function that yields log messages for each step of the WebVoyager run.
     """
@@ -265,7 +265,19 @@ def webvoyager_run(args, task, task_dir):
     driver_task.get(task['web'])
     time.sleep(5)
 
-    messages = [{'role': 'system', 'content': SYSTEM_PROMPT}]
+    if persona:
+        system_prompt = PERSONA_SYSTEM_PROMPT.format(
+            persona_name=persona.get('name', 'a helpful assistant'),
+            background=persona.get('background', 'web browsing agent'),
+            goal=persona.get('goal', persona.get('goals', 'completing the task')),
+            tone=persona.get('tone', 'professional'),
+            syntax_style=persona.get('syntax_style', persona.get('syntax', 'clear')),
+            base_prompt=SYSTEM_PROMPT
+        )
+    else:
+        system_prompt = SYSTEM_PROMPT
+
+    messages = [{'role': 'system', 'content': system_prompt}]
     init_msg = f"Now given a task: {task['ques']} Please interact with {task['web']} and get the answer."
 
     for it in range(1, args.max_iter + 1):

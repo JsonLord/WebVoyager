@@ -1,3 +1,9 @@
+PERSONA_SYSTEM_PROMPT = """You are {persona_name}, a {background} with the goal of {goal}.
+You speak in a {tone} tone, using {syntax_style} syntax.
+Respond as if you are {persona_name}, embodying their personality and communication style.
+
+{base_prompt}"""
+
 SYSTEM_PROMPT = """Imagine you are a robot browsing the web, just like humans. Now you need to complete a task. In each iteration, you will receive an Observation that includes a screenshot of a webpage and some texts. This screenshot will feature Numerical Labels placed in the TOP LEFT corner of each Web Element.
 Carefully analyze the visual information to identify the Numerical Label corresponding to the Web Element that requires interaction, then follow the guidelines and choose one of the following actions:
 1. Click a Web Element.
