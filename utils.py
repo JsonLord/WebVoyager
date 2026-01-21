@@ -414,9 +414,16 @@ def generate_persona(business_description, customer_profile):
 
     def call_api():
         try:
-            logging.info(f"Generating persona for business: {business_description} and customer: {customer_profile}")
+            logging.info(f"[TinyTroupe] Initiating persona generation.")
+            logging.info(f"[TinyTroupe] Business: {business_description}")
+            logging.info(f"[TinyTroupe] Customer: {customer_profile}")
+
             tinytroupe_space = os.environ.get("TINYTROUPE_SPACE", "harvesthealth/tiny_factory")
+            logging.info(f"[TinyTroupe] Connecting to Hugging Face Space: {tinytroupe_space}...")
+
             client = Client(tinytroupe_space)
+            logging.info(f"[TinyTroupe] Connection established. Sending request to /generate_personas...")
+
             result = client.predict(
                 business_description=business_description,
                 customer_profile=customer_profile,
@@ -424,21 +431,30 @@ def generate_persona(business_description, customer_profile):
                 blablador_api_key=None,
                 api_name="/generate_personas"
             )
+            logging.info(f"[TinyTroupe] Received response from API.")
             return result
         except Exception as e:
-            logging.error(f"TinyTroupe API call failed: {e}")
+            logging.error(f"[TinyTroupe] API call failed: {str(e)}")
+            import traceback
+            logging.error(traceback.format_exc())
             return None
 
     try:
+        logging.info(f"[TinyTroupe] Starting API call with 60s timeout...")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(call_api)
-            # Timeout after 60 seconds
             result = future.result(timeout=60)
 
+        if result is None:
+            logging.warning("[TinyTroupe] No result returned from API call.")
+            return None
+
         # Result is likely a JSON string or a list/dict
+        logging.info(f"[TinyTroupe] Parsing result of type: {type(result)}")
         if isinstance(result, str):
             try:
                 personas = json.loads(result)
+                logging.info("[TinyTroupe] Successfully parsed JSON string.")
             except json.JSONDecodeError:
                 # If it's not valid JSON, it might be a raw string from the API
                 logging.warning(f"Failed to decode persona JSON: {result}")

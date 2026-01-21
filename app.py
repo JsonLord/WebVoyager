@@ -6,6 +6,8 @@ import tempfile
 import threading
 import json
 import traceback
+import concurrent.futures
+import time
 from run import webvoyager_run
 from utils import generate_persona
 import re
@@ -59,15 +61,6 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
     """
     A wrapper to run the webvoyager script for Gradio, capturing output and screenshots.
     """
-    persona = None
-    if business_description and customer_profile:
-        yield None, "Generating persona from TinyTroupe...", "", None
-        persona = generate_persona(business_description, customer_profile)
-        if persona:
-            yield None, f"Persona generated: {persona.get('name', 'Unknown')}\n", "", None
-        else:
-            yield None, "Failed to generate persona. Proceeding with default persona.\n", "", None
-
     with tempfile.TemporaryDirectory() as temp_dir:
         task_file_path = os.path.join(temp_dir, 'task.jsonl')
         with open(task_file_path, 'w') as f:
@@ -99,10 +92,53 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
         task_dir = os.path.join(args.output_dir, 'taskcustom_task')
         os.makedirs(task_dir, exist_ok=True)
 
+        # Import run here to avoid circular dependency if any, but mainly to use its setup_logger
+        from run import setup_logger
+        setup_logger(task_dir)
+
         full_log = ""
         last_screenshot = None # Keep track of the last image to ensure we always show something
         debug_log = ""
         raw_log_file_path = os.path.join(task_dir, "raw_log.txt")
+        # Ensure the raw_log file exists so Gradio's File component doesn't fail
+        with open(raw_log_file_path, "w") as f:
+            f.write("")
+
+        persona = None
+        if business_description and customer_profile:
+            full_log += "--- Initializing TinyTroupe Persona ---\n"
+            yield last_screenshot, full_log, debug_log, raw_log_file_path
+
+            with concurrent.futures.ThreadPoolExecutor() as executor:
+                future = executor.submit(generate_persona, business_description, customer_profile)
+
+                # Poll for log updates while persona is being generated
+                while not future.done():
+                    try:
+                        with open(os.path.join(task_dir, 'agent.log'), 'r') as f:
+                            new_debug_log = f.read()
+                            if new_debug_log != debug_log:
+                                debug_log = new_debug_log
+                                yield last_screenshot, full_log, debug_log, raw_log_file_path
+                    except Exception:
+                        pass
+                    time.sleep(0.5)
+
+                persona = future.result()
+
+            # Final debug log read after persona generation
+            try:
+                with open(os.path.join(task_dir, 'agent.log'), 'r') as f:
+                    debug_log = f.read()
+            except Exception:
+                pass
+
+            if persona:
+                full_log += f"Persona generated: {persona.get('name', 'Unknown')}\n"
+            else:
+                full_log += "Failed to generate persona. Proceeding with default persona.\n"
+
+            yield last_screenshot, full_log, debug_log, raw_log_file_path
 
         try:
             # We'll get real-time updates by iterating through the run function

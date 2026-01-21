@@ -266,15 +266,29 @@ def webvoyager_run(args, task, task_dir, persona=None):
     time.sleep(5)
 
     if persona:
+        logging.info(f"Applying persona to system prompt: {persona.get('name', 'Unknown')}")
+        persona_name = persona.get('name', 'a helpful assistant')
+        background = persona.get('background', 'web browsing agent')
+        goal = persona.get('goal', persona.get('goals', 'completing the task'))
+        tone = persona.get('tone', 'professional')
+        syntax_style = persona.get('syntax_style', persona.get('syntax', 'clear'))
+
+        logging.info(f"Persona Name: {persona_name}")
+        logging.info(f"Background: {background}")
+        logging.info(f"Goal: {goal}")
+        logging.info(f"Tone: {tone}")
+        logging.info(f"Syntax Style: {syntax_style}")
+
         system_prompt = PERSONA_SYSTEM_PROMPT.format(
-            persona_name=persona.get('name', 'a helpful assistant'),
-            background=persona.get('background', 'web browsing agent'),
-            goal=persona.get('goal', persona.get('goals', 'completing the task')),
-            tone=persona.get('tone', 'professional'),
-            syntax_style=persona.get('syntax_style', persona.get('syntax', 'clear')),
+            persona_name=persona_name,
+            background=background,
+            goal=goal,
+            tone=tone,
+            syntax_style=syntax_style,
             base_prompt=SYSTEM_PROMPT
         )
     else:
+        logging.info("No persona provided. Using default system prompt.")
         system_prompt = SYSTEM_PROMPT
 
     messages = [{'role': 'system', 'content': system_prompt}]
