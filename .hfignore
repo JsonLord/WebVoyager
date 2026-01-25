@@ -1,0 +1,10 @@
+.git
+__pycache__
+webvoyager_enhanced_vision_repo
+jules
+assets
+project_scan_review.md
+*.log
+*.png
+results
+downloads

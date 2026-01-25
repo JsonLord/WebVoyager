@@ -1,7 +1,9 @@
-openai==1.12.0
-selenium==4.15.2
-pillow==10.2.0
+openai
+selenium
+pillow
 gradio
-huggingface-hub==0.19.4
-httpx==0.27.2
+huggingface-hub==0.24.3
+httpx
 gradio-client
+fastapi
+uvicorn

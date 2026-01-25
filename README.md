@@ -1,10 +1,10 @@
 ---
-title: webvoyager_local_vision_models_free_api
+title: TinyTroupe Alpha
 emoji: 🚀
 colorFrom: blue
 colorTo: purple
 sdk: gradio
-sdk_version: 6.3.0
+sdk_version: 4.44.1
 app_file: app.py
 python_version: '3.10'
 ---
