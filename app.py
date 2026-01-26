@@ -118,7 +118,7 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
         persona = None
         if business_description and customer_profile:
             full_log += "--- Initializing TinyTroupe Persona ---\n"
-            yield last_screenshot_html, full_log, debug_log, "Raw log will be available here."
+            yield last_screenshot_html, full_log, debug_log, "--- Initializing TinyTroupe Persona ---"
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(generate_persona, business_description, customer_profile)
@@ -129,11 +129,15 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
                         with open(os.path.join(task_dir, 'agent.log'), 'r') as f:
                             new_debug_log = f.read()
                             if new_debug_log != debug_log:
+                                # Extract last few lines as status update
+                                status_lines = [l for l in new_debug_log[len(debug_log):].split('\n') if l.strip()]
+                                if status_lines:
+                                    last_status = status_lines[-1]
+                                    yield last_screenshot_html, full_log, new_debug_log, f"Status: {last_status}"
                                 debug_log = new_debug_log
-                                yield last_screenshot_html, full_log, debug_log, "Raw log will be available here."
                     except Exception:
                         pass
-                    time.sleep(0.5)
+                    time.sleep(1.0)
 
                 persona = future.result()
 

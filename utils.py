@@ -424,7 +424,9 @@ def generate_persona(business_description, customer_profile):
             hf_token = os.environ.get("HF_TOKEN")
 
             # Construct Gradio 6 API URL
-            host = f"https://{tinytroupe_space.replace('/', '-')}.hf.space"
+            # Replace both / and _ with - for the subdomain
+            subdomain = tinytroupe_space.replace('/', '-').replace('_', '-')
+            host = f"https://{subdomain}.hf.space"
             base_url = f"{host}/gradio_api/call/generate_personas"
 
             data = {"data": [business_description, customer_profile, 1, None]}
@@ -434,8 +436,9 @@ def generate_persona(business_description, customer_profile):
 
             logging.info(f"[TinyTroupe] POSTing to {base_url}...")
             # Use a longer timeout for both connect and read
-            timeout = httpx.Timeout(360.0, connect=60.0)
-            with httpx.Client(timeout=timeout) as client:
+            timeout = httpx.Timeout(900.0, connect=60.0)
+            # Disable SSL verification if hostname mismatch persists, but first let's fix the hostname
+            with httpx.Client(timeout=timeout, verify=True) as client:
                 resp = client.post(base_url, json=data, headers=headers)
                 if resp.status_code != 200:
                     logging.error(f"[TinyTroupe] POST failed with {resp.status_code}: {resp.text}")
@@ -477,11 +480,11 @@ def generate_persona(business_description, customer_profile):
             return None
 
     try:
-        logging.info(f"[TinyTroupe] Starting API call with 360s timeout...")
+        logging.info(f"[TinyTroupe] Starting API call with 900s timeout...")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(call_api)
             # Give it a bit more buffer for the thread result
-            result = future.result(timeout=370)
+            result = future.result(timeout=910)
 
         if result is None:
             logging.warning("[TinyTroupe] No result returned from API call.")
