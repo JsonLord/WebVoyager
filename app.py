@@ -1,4 +1,5 @@
 import gradio as gr
+from fastapi import FastAPI
 import argparse
 import os
 import sys
@@ -8,9 +9,18 @@ import json
 import traceback
 import concurrent.futures
 import time
+import base64
 from run import webvoyager_run
 from utils import generate_persona
 import re
+import logging
+
+# Set up FastAPI for health checks
+app = FastAPI()
+
+@app.get("/health")
+def health():
+    return {"status": "ok"}
 
 def format_log_for_gradio(log_content):
     """
@@ -97,17 +107,17 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
         setup_logger(task_dir)
 
         full_log = ""
-        last_screenshot = None # Keep track of the last image to ensure we always show something
+        last_screenshot_html = "" # Keep track of the last image to ensure we always show something
         debug_log = ""
         raw_log_file_path = os.path.join(task_dir, "raw_log.txt")
-        # Ensure the raw_log file exists so Gradio's File component doesn't fail
+        # Ensure the raw_log file exists
         with open(raw_log_file_path, "w") as f:
             f.write("")
 
         persona = None
         if business_description and customer_profile:
             full_log += "--- Initializing TinyTroupe Persona ---\n"
-            yield last_screenshot, full_log, debug_log, raw_log_file_path
+            yield last_screenshot_html, full_log, debug_log, "Raw log will be available here."
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
                 future = executor.submit(generate_persona, business_description, customer_profile)
@@ -119,7 +129,7 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
                             new_debug_log = f.read()
                             if new_debug_log != debug_log:
                                 debug_log = new_debug_log
-                                yield last_screenshot, full_log, debug_log, raw_log_file_path
+                                yield last_screenshot_html, full_log, debug_log, "Raw log will be available here."
                     except Exception:
                         pass
                     time.sleep(0.5)
@@ -138,7 +148,7 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
             else:
                 full_log += "Failed to generate persona. Proceeding with default persona.\n"
 
-            yield last_screenshot, full_log, debug_log, raw_log_file_path
+            yield last_screenshot_html, full_log, debug_log, "Raw log will be available here."
 
         try:
             # We'll get real-time updates by iterating through the run function
@@ -152,7 +162,7 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
                         log_data = json.loads(log_entry)
                         if log_data.get("status"):
                             full_log += f"{log_data['status']}\n"
-                            yield last_screenshot, full_log, debug_log, raw_log_file_path
+                            yield last_screenshot_html, full_log, debug_log, f"Log file: {raw_log_file_path}"
                             continue
                     except (json.JSONDecodeError, AttributeError):
                         pass # Not a status update, proceed as normal
@@ -180,32 +190,46 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
                         pass # If directory read fails momentarily, just skip update
 
                     if current_screenshot and os.path.exists(current_screenshot):
-                        last_screenshot = current_screenshot
+                        with open(current_screenshot, "rb") as img_file:
+                            b64_data = base64.b64encode(img_file.read()).decode('utf-8')
+                            last_screenshot_html = f"<img src='data:image/png;base64,{b64_data}' style='max-width: 100%;'>"
                     
-                    yield last_screenshot, full_log, debug_log, raw_log_file_path
+                    yield last_screenshot_html, full_log, debug_log, f"Log file: {raw_log_file_path}"
 
         except Exception as e:
             tb = traceback.format_exc()
             full_log += f"An error occurred: {e}\n\nFull Traceback:\n{tb}"
-            yield last_screenshot, full_log, debug_log, raw_log_file_path
+            yield last_screenshot_html, full_log, debug_log, f"Error: {e}"
 
-iface = gr.Interface(
-    fn=run_script_for_gradio,
-    inputs=[
-        gr.Textbox(label="URL", placeholder="Enter the URL of the website"),
-        gr.Textbox(label="Task", placeholder="Describe the task to perform"),
-        gr.Textbox(label="Business Description (TinyTroupe)", placeholder="What is your business about?"),
-        gr.Textbox(label="Customer Profile (TinyTroupe)", placeholder="Information about your customer profile"),
-    ],
-    outputs=[
-        gr.Image(label="Agent's View", type="filepath"),
-        gr.Textbox(label="Agent Output", lines=20, interactive=False),
-        gr.Textbox(label="Debug Log", lines=10, interactive=False),
-        gr.File(label="Raw Log File"),
-    ],
-    title="WebVoyager",
-    description="An LMM-powered web agent that can complete user instructions end-to-end.",
-)
+with gr.Blocks() as iface:
+    gr.Markdown("# WebVoyager")
+    gr.Markdown("An LMM-powered web agent that can complete user instructions end-to-end.")
+
+    with gr.Row():
+        with gr.Column():
+            url_input = gr.Textbox(label="URL", placeholder="Enter the URL of the website")
+            task_input = gr.Textbox(label="Task", placeholder="Describe the task to perform")
+            business_input = gr.Textbox(label="Business Description (TinyTroupe)", placeholder="What is your business about?")
+            customer_input = gr.Textbox(label="Customer Profile (TinyTroupe)", placeholder="Information about your customer profile")
+            submit_btn = gr.Button("Submit")
+
+        with gr.Column():
+            screenshot_output = gr.HTML(label="Agent's View")
+            agent_output = gr.Textbox(label="Agent Output", lines=20, interactive=False)
+
+    with gr.Row():
+        debug_output = gr.Textbox(label="Debug Log", lines=10, interactive=False)
+        raw_log_status = gr.Markdown(label="Raw Log Status")
+
+    submit_btn.click(
+        run_script_for_gradio,
+        inputs=[url_input, task_input, business_input, customer_input],
+        outputs=[screenshot_output, agent_output, debug_output, raw_log_status]
+    )
+
+# Mount Gradio to FastAPI
+app = gr.mount_gradio_app(app, iface, path="/")
 
 if __name__ == "__main__":
-    iface.launch()
+    import uvicorn
+    uvicorn.run(app, host="0.0.0.0", port=7860)
