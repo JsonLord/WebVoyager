@@ -144,25 +144,41 @@ def call_gpt4v_api(args, client_blablador, client_openai, messages):
 
 
 def exec_action_click(info, web_ele, driver_task, task_dir, it_action):
+    # Capture location/size before click to avoid StaleElementReferenceException after navigation
+    try:
+        location = web_ele.location
+        size = web_ele.size
+    except Exception as e:
+        logging.error(f"Error getting element properties before click: {e}")
+        location, size = None, None
+
     driver_task.execute_script("arguments[0].setAttribute('target', '_self')", web_ele)
     web_ele.click()
     time.sleep(3)
     img_path = os.path.join(task_dir, f'screenshot{it_action}.png')
     driver_task.save_screenshot(img_path)
-    try:
-        location = web_ele.location
-        size = web_ele.size
-        img = Image.open(img_path)
-        draw = ImageDraw.Draw(img)
-        draw.rectangle([location['x'], location['y'], location['x'] + size['width'], location['y'] + size['height']], outline="red", width=3)
-        img.save(img_path)
-    except Exception as e:
-        logging.error(f"Error highlighting element: {e}")
+
+    if location and size:
+        try:
+            img = Image.open(img_path)
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([location['x'], location['y'], location['x'] + size['width'], location['y'] + size['height']], outline="red", width=3)
+            img.save(img_path)
+        except Exception as e:
+            logging.error(f"Error highlighting element: {e}")
 
 
 def exec_action_type(info, web_ele, driver_task, task_dir, it_action):
     warn_obs = ""
     type_content = info['content']
+
+    # Capture location/size before typing/enter to avoid StaleElementReferenceException after navigation
+    try:
+        location = web_ele.location
+        size = web_ele.size
+    except Exception as e:
+        logging.error(f"Error getting element properties before type: {e}")
+        location, size = None, None
 
     ele_tag_name = web_ele.tag_name.lower()
     ele_type = web_ele.get_attribute("type")
@@ -199,15 +215,15 @@ def exec_action_type(info, web_ele, driver_task, task_dir, it_action):
     time.sleep(10)
     img_path = os.path.join(task_dir, f'screenshot{it_action}.png')
     driver_task.save_screenshot(img_path)
-    try:
-        location = web_ele.location
-        size = web_ele.size
-        img = Image.open(img_path)
-        draw = ImageDraw.Draw(img)
-        draw.rectangle([location['x'], location['y'], location['x'] + size['width'], location['y'] + size['height']], outline="red", width=3)
-        img.save(img_path)
-    except Exception as e:
-        logging.error(f"Error highlighting element: {e}")
+
+    if location and size:
+        try:
+            img = Image.open(img_path)
+            draw = ImageDraw.Draw(img)
+            draw.rectangle([location['x'], location['y'], location['x'] + size['width'], location['y'] + size['height']], outline="red", width=3)
+            img.save(img_path)
+        except Exception as e:
+            logging.error(f"Error highlighting element: {e}")
     return warn_obs
 
 

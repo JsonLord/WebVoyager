@@ -14,6 +14,7 @@ from run import webvoyager_run
 from utils import generate_persona
 import re
 import logging
+from gradio_logsview import LogsView
 
 # Set up FastAPI for health checks
 app = FastAPI()
@@ -220,6 +221,8 @@ with gr.Blocks() as iface:
     with gr.Row():
         debug_output = gr.Textbox(label="Debug Log", lines=10, interactive=False)
         raw_log_status = gr.Markdown(label="Raw Log Status")
+
+    logs_view = LogsView(label="Internal Process Logs")
 
     submit_btn.click(
         run_script_for_gradio,

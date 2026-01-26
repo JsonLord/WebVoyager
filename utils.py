@@ -419,9 +419,10 @@ def generate_persona(business_description, customer_profile):
             logging.info(f"[TinyTroupe] Customer: {customer_profile}")
 
             tinytroupe_space = os.environ.get("TINYTROUPE_SPACE", "harvesthealth/tiny_factory")
+            hf_token = os.environ.get("HF_TOKEN")
             logging.info(f"[TinyTroupe] Connecting to Hugging Face Space: {tinytroupe_space}...")
 
-            client = Client(tinytroupe_space)
+            client = Client(tinytroupe_space, hf_token=hf_token)
             logging.info(f"[TinyTroupe] Connection established. Sending request to /generate_personas...")
 
             result = client.predict(
@@ -440,10 +441,10 @@ def generate_persona(business_description, customer_profile):
             return None
 
     try:
-        logging.info(f"[TinyTroupe] Starting API call with 60s timeout...")
+        logging.info(f"[TinyTroupe] Starting API call with 300s timeout...")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(call_api)
-            result = future.result(timeout=60)
+            result = future.result(timeout=300)
 
         if result is None:
             logging.warning("[TinyTroupe] No result returned from API call.")
