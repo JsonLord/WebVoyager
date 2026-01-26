@@ -435,19 +435,16 @@ def generate_persona(business_description, customer_profile):
             return result
         except Exception as e:
             logging.error(f"[TinyTroupe] API call failed: {str(e)}")
-            import traceback
-            logging.error(traceback.format_exc())
             return None
 
     try:
-        logging.info(f"[TinyTroupe] Starting API call with 60s timeout...")
+        logging.info(f"[TinyTroupe] Starting API call with 300s timeout...")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(call_api)
-            result = future.result(timeout=60)
+            result = future.result(timeout=300)
 
         if result is None:
-            logging.warning("[TinyTroupe] No result returned from API call.")
-            return None
+            raise Exception("No result from API")
 
         # Result is likely a JSON string or a list/dict
         logging.info(f"[TinyTroupe] Parsing result of type: {type(result)}")
@@ -458,7 +455,7 @@ def generate_persona(business_description, customer_profile):
             except json.JSONDecodeError:
                 # If it's not valid JSON, it might be a raw string from the API
                 logging.warning(f"Failed to decode persona JSON: {result}")
-                return None
+                raise Exception("JSON decode error")
         else:
             personas = result
 
@@ -466,5 +463,41 @@ def generate_persona(business_description, customer_profile):
             return personas[0]
         return personas
     except Exception as e:
-        logging.error(f"Error generating persona: {e}")
-        return None
+        logging.warning(f"[TinyTroupe] API call failed or timed out: {str(e)}. Falling back to local library.")
+        try:
+            logging.info("[TinyTroupe] Attempting local persona generation...")
+
+            # Set environment variable for TinyTroupe if available
+            blablador_token = os.environ.get("BBLABLADOR_API_TOKEN") or os.environ.get("BLABLADOR_API_KEY") or os.environ.get("OPENAI_API_KEY")
+            if blablador_token:
+                os.environ["BLABLADOR_API_KEY"] = blablador_token
+                logging.info("[TinyTroupe] Using BLABLADOR_API_KEY from environment.")
+
+            from tinytroupe.factory import TinyPersonFactory
+
+            context = f"Business: {business_description}. Customer Profile: {customer_profile}."
+            factory = TinyPersonFactory(context=context)
+
+            # Generate exactly 1 persona as requested
+            logging.info("[TinyTroupe] Generating 1 persona using local factory...")
+            person = factory.generate_person("A typical customer")
+
+            if person:
+                persona_data = {
+                    "name": person.get("name"),
+                    "background": person.minibio() if hasattr(person, 'minibio') else "Web user",
+                    "goal": "interact with the website effectively",
+                    "tone": "helpful and clear",
+                    "syntax_style": "standard"
+                }
+                logging.info(f"[TinyTroupe] Successfully generated local persona: {persona_data['name']}")
+                return persona_data
+            else:
+                logging.error("[TinyTroupe] Local persona generation failed.")
+                return None
+
+        except Exception as local_e:
+            logging.error(f"[TinyTroupe] Local fallback failed: {str(local_e)}")
+            import traceback
+            logging.error(traceback.format_exc())
+            return None
