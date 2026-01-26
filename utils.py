@@ -408,37 +408,68 @@ def get_pdf_retrieval_ans_from_assistant(client, pdf_path, task):
 
 import concurrent.futures
 
+import httpx
+
 def generate_persona(business_description, customer_profile):
     if not business_description or not customer_profile:
         return None
 
     def call_api():
         try:
-            logging.info(f"[TinyTroupe] Initiating persona generation.")
+            logging.info(f"[TinyTroupe] Initiating persona generation (Manual API call).")
             logging.info(f"[TinyTroupe] Business: {business_description}")
             logging.info(f"[TinyTroupe] Customer: {customer_profile}")
 
             tinytroupe_space = os.environ.get("TINYTROUPE_SPACE", "harvesthealth/tiny_factory")
             hf_token = os.environ.get("HF_TOKEN")
-            logging.info(f"[TinyTroupe] Connecting to Hugging Face Space: {tinytroupe_space}...")
 
-            try:
-                client = Client(tinytroupe_space, hf_token=hf_token)
-            except Exception as e:
-                logging.error(f"[TinyTroupe] Failed to initialize Client: {e}")
-                return None
+            # Construct Gradio 6 API URL
+            host = f"https://{tinytroupe_space.replace('/', '-')}.hf.space"
+            base_url = f"{host}/gradio_api/call/generate_personas"
 
-            logging.info(f"[TinyTroupe] Connection established. Sending request to /generate_personas...")
+            data = {"data": [business_description, customer_profile, 1, None]}
+            headers = {}
+            if hf_token:
+                headers["Authorization"] = f"Bearer {hf_token}"
 
-            result = client.predict(
-                business_description=business_description,
-                customer_profile=customer_profile,
-                num_personas=1,
-                blablador_api_key=None,
-                api_name="/generate_personas"
-            )
-            logging.info(f"[TinyTroupe] Received response from API.")
-            return result
+            logging.info(f"[TinyTroupe] POSTing to {base_url}...")
+            # Use a longer timeout for both connect and read
+            timeout = httpx.Timeout(360.0, connect=60.0)
+            with httpx.Client(timeout=timeout) as client:
+                resp = client.post(base_url, json=data, headers=headers)
+                if resp.status_code != 200:
+                    logging.error(f"[TinyTroupe] POST failed with {resp.status_code}: {resp.text}")
+                    return None
+
+                event_id = resp.json().get("event_id")
+                if not event_id:
+                    logging.error(f"[TinyTroupe] No event_id in response: {resp.text}")
+                    return None
+
+                result_url = f"{base_url}/{event_id}"
+                logging.info(f"[TinyTroupe] Event ID: {event_id}. Streaming from {result_url}...")
+
+                with client.stream("GET", result_url, headers=headers) as r:
+                    for line in r.iter_lines():
+                        if line.startswith("data:"):
+                            content = line[5:].strip()
+                            if content == "null":
+                                continue
+                            try:
+                                payload = json.loads(content)
+                                if isinstance(payload, list) and len(payload) > 0:
+                                    if payload[0] is not None:
+                                        logging.info(f"[TinyTroupe] Received result.")
+                                        return payload[0]
+                            except Exception as e:
+                                logging.warning(f"[TinyTroupe] Failed to parse data line: {e}")
+                        elif line.startswith("event: complete"):
+                            logging.info("[TinyTroupe] Event complete.")
+                            break
+                        elif line.startswith("event: error"):
+                            logging.error(f"[TinyTroupe] SSE Event error: {line}")
+                            return None
+            return None
         except Exception as e:
             logging.error(f"[TinyTroupe] API call failed: {str(e)}")
             import traceback
@@ -449,7 +480,8 @@ def generate_persona(business_description, customer_profile):
         logging.info(f"[TinyTroupe] Starting API call with 360s timeout...")
         with concurrent.futures.ThreadPoolExecutor() as executor:
             future = executor.submit(call_api)
-            result = future.result(timeout=360)
+            # Give it a bit more buffer for the thread result
+            result = future.result(timeout=370)
 
         if result is None:
             logging.warning("[TinyTroupe] No result returned from API call.")
