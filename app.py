@@ -68,7 +68,7 @@ def format_log_for_gradio(log_content):
     return formatted_output
 
 
-def run_script_for_gradio(url, task, business_description=None, customer_profile=None):
+def run_script_for_gradio(url, task, persona_criteria=None):
     """
     A wrapper to run the webvoyager script for Gradio, capturing output and screenshots.
     """
@@ -116,12 +116,12 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
             f.write("")
 
         persona = None
-        if business_description and customer_profile:
+        if persona_criteria:
             full_log += "--- Initializing TinyTroupe Persona ---\n"
             yield last_screenshot_html, full_log, debug_log, "--- Initializing TinyTroupe Persona ---"
 
             with concurrent.futures.ThreadPoolExecutor() as executor:
-                future = executor.submit(generate_persona, business_description, customer_profile)
+                future = executor.submit(generate_persona, persona_criteria)
 
                 # Poll for log updates while persona is being generated
                 while not future.done():
@@ -215,8 +215,7 @@ with gr.Blocks() as iface:
         with gr.Column():
             url_input = gr.Textbox(label="URL", placeholder="Enter the URL of the website")
             task_input = gr.Textbox(label="Task", placeholder="Describe the task to perform")
-            business_input = gr.Textbox(label="Business Description (TinyTroupe)", placeholder="What is your business about?")
-            customer_input = gr.Textbox(label="Customer Profile (TinyTroupe)", placeholder="Information about your customer profile")
+            criteria_input = gr.Textbox(label="Persona Criteria (TinyTroupe)", placeholder="Describe the persona you want (e.g. salesman for CRM)")
             submit_btn = gr.Button("Submit")
 
         with gr.Column():
@@ -231,7 +230,7 @@ with gr.Blocks() as iface:
 
     submit_btn.click(
         run_script_for_gradio,
-        inputs=[url_input, task_input, business_input, customer_input],
+        inputs=[url_input, task_input, criteria_input],
         outputs=[screenshot_output, agent_output, debug_output, raw_log_status]
     )
 

@@ -410,15 +410,14 @@ import concurrent.futures
 
 import httpx
 
-def generate_persona(business_description, customer_profile):
-    if not business_description or not customer_profile:
+def generate_persona(criteria):
+    if not criteria:
         return None
 
     def call_api():
         try:
-            logging.info(f"[TinyTroupe] Initiating persona generation (Manual API call).")
-            logging.info(f"[TinyTroupe] Business: {business_description}")
-            logging.info(f"[TinyTroupe] Customer: {customer_profile}")
+            logging.info(f"[TinyTroupe] Initiating persona generation (find_best_persona).")
+            logging.info(f"[TinyTroupe] Criteria: {criteria}")
 
             tinytroupe_space = os.environ.get("TINYTROUPE_SPACE", "harvesthealth/tiny_factory")
             hf_token = os.environ.get("HF_TOKEN")
@@ -427,9 +426,9 @@ def generate_persona(business_description, customer_profile):
             # Replace both / and _ with - for the subdomain
             subdomain = tinytroupe_space.replace('/', '-').replace('_', '-')
             host = f"https://{subdomain}.hf.space"
-            base_url = f"{host}/gradio_api/call/generate_personas"
+            base_url = f"{host}/gradio_api/call/find_best_persona"
 
-            data = {"data": [business_description, customer_profile, 1, None]}
+            data = {"data": [criteria]}
             headers = {}
             if hf_token:
                 headers["Authorization"] = f"Bearer {hf_token}"
@@ -437,7 +436,6 @@ def generate_persona(business_description, customer_profile):
             logging.info(f"[TinyTroupe] POSTing to {base_url}...")
             # Use a longer timeout for both connect and read
             timeout = httpx.Timeout(900.0, connect=60.0)
-            # Disable SSL verification if hostname mismatch persists, but first let's fix the hostname
             with httpx.Client(timeout=timeout, verify=True) as client:
                 resp = client.post(base_url, json=data, headers=headers)
                 if resp.status_code != 200:
@@ -452,6 +450,7 @@ def generate_persona(business_description, customer_profile):
                 result_url = f"{base_url}/{event_id}"
                 logging.info(f"[TinyTroupe] Event ID: {event_id}. Streaming from {result_url}...")
 
+                last_data = None
                 with client.stream("GET", result_url, headers=headers) as r:
                     for line in r.iter_lines():
                         if line.startswith("data:"):
@@ -462,16 +461,21 @@ def generate_persona(business_description, customer_profile):
                                 payload = json.loads(content)
                                 if isinstance(payload, list) and len(payload) > 0:
                                     if payload[0] is not None:
-                                        logging.info(f"[TinyTroupe] Received result.")
-                                        return payload[0]
+                                        last_data = payload[0]
                             except Exception as e:
                                 logging.warning(f"[TinyTroupe] Failed to parse data line: {e}")
                         elif line.startswith("event: complete"):
                             logging.info("[TinyTroupe] Event complete.")
-                            break
                         elif line.startswith("event: error"):
                             logging.error(f"[TinyTroupe] SSE Event error: {line}")
                             return None
+
+                if last_data:
+                    if isinstance(last_data, dict) and "error" in last_data:
+                        logging.error(f"[TinyTroupe] API returned error: {last_data['error']}")
+                        return None
+                    logging.info(f"[TinyTroupe] Received result.")
+                    return last_data
             return None
         except Exception as e:
             logging.error(f"[TinyTroupe] API call failed: {str(e)}")
