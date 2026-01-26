@@ -465,13 +465,16 @@ def generate_persona(business_description, customer_profile):
     except Exception as e:
         logging.warning(f"[TinyTroupe] API call failed or timed out: {str(e)}. Falling back to local library.")
         try:
-            logging.info("[TinyTroupe] Attempting local persona generation...")
+            logging.info("[TinyTroupe] Attempting local persona generation (fallback)...")
 
             # Set environment variable for TinyTroupe if available
+            # User specifically mentioned BBLABLADOR_API_TOKEN (double B)
             blablador_token = os.environ.get("BBLABLADOR_API_TOKEN") or os.environ.get("BLABLADOR_API_KEY") or os.environ.get("OPENAI_API_KEY")
             if blablador_token:
                 os.environ["BLABLADOR_API_KEY"] = blablador_token
-                logging.info("[TinyTroupe] Using BLABLADOR_API_KEY from environment.")
+                logging.info(f"[TinyTroupe] Using API key from environment.")
+            else:
+                logging.warning("[TinyTroupe] No API key found in environment for local fallback.")
 
             from tinytroupe.factory import TinyPersonFactory
 
@@ -479,18 +482,26 @@ def generate_persona(business_description, customer_profile):
             factory = TinyPersonFactory(context=context)
 
             # Generate exactly 1 persona as requested
-            logging.info("[TinyTroupe] Generating 1 persona using local factory...")
+            logging.info("[TinyTroupe] Generating max 1 persona using local factory...")
             person = factory.generate_person("A typical customer")
 
             if person:
+                # Extract basic info
+                name = person.get("name")
+                bio = "Web user"
+                try:
+                    bio = person.minibio()
+                except:
+                    pass
+
                 persona_data = {
-                    "name": person.get("name"),
-                    "background": person.minibio() if hasattr(person, 'minibio') else "Web user",
+                    "name": name,
+                    "background": bio,
                     "goal": "interact with the website effectively",
                     "tone": "helpful and clear",
                     "syntax_style": "standard"
                 }
-                logging.info(f"[TinyTroupe] Successfully generated local persona: {persona_data['name']}")
+                logging.info(f"[TinyTroupe] Successfully generated local persona: {name}")
                 return persona_data
             else:
                 logging.error("[TinyTroupe] Local persona generation failed.")

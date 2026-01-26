@@ -1,5 +1,6 @@
 import gradio as gr
 import argparse
+import logging
 import os
 import sys
 import tempfile
@@ -189,23 +190,71 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
             full_log += f"An error occurred: {e}\n\nFull Traceback:\n{tb}"
             yield last_screenshot, full_log, debug_log, raw_log_file_path
 
-iface = gr.Interface(
-    fn=run_script_for_gradio,
-    inputs=[
-        gr.Textbox(label="URL", placeholder="Enter the URL of the website"),
-        gr.Textbox(label="Task", placeholder="Describe the task to perform"),
-        gr.Textbox(label="Business Description (TinyTroupe)", placeholder="What is your business about?"),
-        gr.Textbox(label="Customer Profile (TinyTroupe)", placeholder="Information about your customer profile"),
-    ],
-    outputs=[
-        gr.Image(label="Agent's View", type="filepath"),
-        gr.Textbox(label="Agent Output", lines=20, interactive=False),
-        gr.Textbox(label="Debug Log", lines=10, interactive=False),
-        gr.File(label="Raw Log File"),
-    ],
-    title="WebVoyager",
-    description="An LMM-powered web agent that can complete user instructions end-to-end.",
-)
+def generate_personas_api(business_description, customer_profile, num_personas=1, blablador_api_key=None):
+    """
+    Exposed API endpoint for generating personas.
+    """
+    logging.info(f"API called: /generate_personas with biz='{business_description}', cust='{customer_profile}', n={num_personas}")
+    if blablador_api_key:
+        os.environ["BLABLADOR_API_KEY"] = blablador_api_key
+        logging.info("Blablador API key provided via API call.")
+
+    # Call the existing utility
+    try:
+        persona = generate_persona(business_description, customer_profile)
+        if persona:
+            logging.info(f"Successfully generated persona: {persona.get('name', 'Unknown')}")
+            return [persona]
+        else:
+            logging.warning("generate_persona returned None")
+    except Exception as e:
+        logging.error(f"Error in generate_personas_api: {str(e)}")
+        import traceback
+        logging.error(traceback.format_exc())
+
+    return []
+
+with gr.Blocks(title="WebVoyager TinyTroupe") as demo:
+    gr.Markdown("# WebVoyager TinyTroupe")
+    gr.Markdown("An LMM-powered web agent that can complete user instructions end-to-end, with custom TinyTroupe personas.")
+
+    with gr.Row():
+        with gr.Column():
+            url_input = gr.Textbox(label="URL", placeholder="Enter the URL of the website")
+            task_input = gr.Textbox(label="Task", placeholder="Describe the task to perform")
+            biz_input = gr.Textbox(label="Business Description (TinyTroupe)", placeholder="What is your business about?")
+            cust_input = gr.Textbox(label="Customer Profile (TinyTroupe)", placeholder="Information about your customer profile")
+            run_btn = gr.Button("Submit", variant="primary")
+            clear_btn = gr.Button("Clear")
+
+        with gr.Column():
+            view_output = gr.Image(label="Agent's View", type="filepath")
+            agent_output = gr.Textbox(label="Agent Output", lines=20, interactive=False)
+            debug_output = gr.Textbox(label="Debug Log", lines=10, interactive=False)
+            log_file_output = gr.File(label="Raw Log File")
+
+    # Set up the main interface click
+    run_btn.click(
+        fn=run_script_for_gradio,
+        inputs=[url_input, task_input, biz_input, cust_input],
+        outputs=[view_output, agent_output, debug_output, log_file_output],
+        api_name="run_script_for_gradio"
+    )
+
+    # Expose the specific generate_personas API
+    with gr.Row(visible=False):
+        num_personas_input = gr.Number(value=1)
+        blablador_key_input = gr.Textbox()
+        gen_personas_api_btn = gr.Button("Generate Personas API")
+
+    gen_personas_api_output = gr.JSON(label="Generated Personas", visible=False)
+
+    gen_personas_api_btn.click(
+        fn=generate_personas_api,
+        inputs=[biz_input, cust_input, num_personas_input, blablador_key_input],
+        outputs=gen_personas_api_output,
+        api_name="generate_personas"
+    )
 
 if __name__ == "__main__":
-    iface.launch()
+    demo.launch()
