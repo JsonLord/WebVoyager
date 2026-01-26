@@ -146,10 +146,11 @@ def run_script_for_gradio(url, task, business_description=None, customer_profile
 
             if persona:
                 full_log += f"Persona generated: {persona.get('name', 'Unknown')}\n"
+                yield last_screenshot_html, full_log, debug_log, "Raw log will be available here."
             else:
-                full_log += "Failed to generate persona. Proceeding with default persona.\n"
-
-            yield last_screenshot_html, full_log, debug_log, "Raw log will be available here."
+                full_log += "Failed to generate persona. STOPPING execution as requested.\n"
+                yield last_screenshot_html, full_log, debug_log, "Task stopped due to persona generation failure."
+                return
 
         try:
             # We'll get real-time updates by iterating through the run function
