@@ -6,6 +6,7 @@ from app.core.config import settings
 class PlannerService:
     def __init__(self):
         self.client = None
+        # Prioritize Blablador
         if settings.BLABLADOR_API_KEY:
             self.client = OpenAI(
                 api_key=settings.BLABLADOR_API_KEY,

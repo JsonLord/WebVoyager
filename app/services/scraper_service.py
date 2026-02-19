@@ -7,6 +7,7 @@ from app.services.browser_service import browser_service
 class ScraperService:
     def __init__(self):
         self.client = None
+        # Prioritize Blablador
         if settings.BLABLADOR_API_KEY:
             self.client = OpenAI(
                 api_key=settings.BLABLADOR_API_KEY,

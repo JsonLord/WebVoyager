@@ -271,7 +271,9 @@ def webvoyager_run(args, task, task_dir, persona=None):
     A generator function that yields log messages for each step of the WebVoyager run.
     """
     client_blablador = OpenAI(api_key=args.api_key, base_url=args.api_base_url, http_client=httpx.Client(trust_env=False))
-    client_openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), http_client=httpx.Client(trust_env=False))
+    client_openai = None
+    if os.environ.get("OPENAI_API_KEY"):
+        client_openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), http_client=httpx.Client(trust_env=False))
     options = driver_config(args)
     setup_logger(task_dir)
     

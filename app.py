@@ -1,3 +1,4 @@
+from app.core.config import settings
 import gradio as gr
 from fastapi import FastAPI
 import argparse
@@ -82,7 +83,7 @@ def run_script_for_gradio(url, task, use_persona, persona_criteria=None):
             max_iter=5,
             api_key=os.environ.get("BLABLADOR_API_KEY"),
             api_base_url="https://api.helmholtz-blablador.fz-juelich.de/v1",
-            api_model="alias_large",
+            api_model=settings.MODEL_LARGE,
             output_dir=os.path.join(temp_dir, 'results'),
             seed=None,
             max_attached_imgs=1,

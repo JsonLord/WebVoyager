@@ -12,6 +12,7 @@ from app.utils.mcp_tools import WEB_AGENT_TOOLS
 class AgentService:
     def __init__(self):
         self.client = None
+        # Prioritize Blablador
         if settings.BLABLADOR_API_KEY:
             self.client = OpenAI(
                 api_key=settings.BLABLADOR_API_KEY,
@@ -22,7 +23,7 @@ class AgentService:
 
     async def execute_task(self, session_id: str, task: str):
         if not self.client:
-            return {"error": "LLM API key not configured"}
+            return {"error": "LLM API key not configured. Please set BLABLADOR_API_KEY."}
 
         # 1. Initial Planning
         driver = browser_service.get_driver(session_id)
