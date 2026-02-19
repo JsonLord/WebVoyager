@@ -7,6 +7,10 @@ class Settings(BaseSettings):
 
     OPENAI_API_KEY: str = os.getenv("OPENAI_API_KEY", "")
     BLABLADOR_API_KEY: str = os.getenv("BLABLADOR_API_KEY", "")
+    BLABLADOR_BASE_URL: str = "https://api.helmholtz-blablador.fz-juelich.de/v1"
+
+    MODEL_LARGE: str = "alias-large"
+    MODEL_FAST: str = "alias-fast"
 
     # Session storage
     SESSIONS_DIR: str = "sessions_data"

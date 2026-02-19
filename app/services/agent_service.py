@@ -12,12 +12,17 @@ from app.utils.mcp_tools import WEB_AGENT_TOOLS
 class AgentService:
     def __init__(self):
         self.client = None
-        if settings.OPENAI_API_KEY:
+        if settings.BLABLADOR_API_KEY:
+            self.client = OpenAI(
+                api_key=settings.BLABLADOR_API_KEY,
+                base_url=settings.BLABLADOR_BASE_URL
+            )
+        elif settings.OPENAI_API_KEY:
             self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     async def execute_task(self, session_id: str, task: str):
         if not self.client:
-            return {"error": "OpenAI API key not configured"}
+            return {"error": "LLM API key not configured"}
 
         # 1. Initial Planning
         driver = browser_service.get_driver(session_id)
@@ -42,7 +47,7 @@ class AgentService:
             # Call LLM
             try:
                 response = self.client.chat.completions.create(
-                    model="gpt-4o",
+                    model=settings.MODEL_LARGE,
                     messages=history,
                     tools=WEB_AGENT_TOOLS,
                     tool_choice="auto"

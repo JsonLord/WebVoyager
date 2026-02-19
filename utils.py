@@ -1,3 +1,4 @@
+from app.core.config import settings
 import base64
 import re
 import os
@@ -371,7 +372,7 @@ def get_pdf_retrieval_ans_from_assistant(client, pdf_path, task):
     logging.info("Create assistant...")
     assistant = client.beta.assistants.create(
         instructions="You are a helpful assistant that can analyze the content of a PDF file and give an answer that matches the given task, or retrieve relevant content that matches the task.",
-        model="alias-fast",
+        model=settings.MODEL_FAST,
         tools=[{"type": "retrieval"}],
         file_ids=[file.id]
     )

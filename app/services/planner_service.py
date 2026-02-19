@@ -6,7 +6,12 @@ from app.core.config import settings
 class PlannerService:
     def __init__(self):
         self.client = None
-        if settings.OPENAI_API_KEY:
+        if settings.BLABLADOR_API_KEY:
+            self.client = OpenAI(
+                api_key=settings.BLABLADOR_API_KEY,
+                base_url=settings.BLABLADOR_BASE_URL
+            )
+        elif settings.OPENAI_API_KEY:
             self.client = OpenAI(api_key=settings.OPENAI_API_KEY)
 
     async def create_plan(self, goal: str, current_url: str = "Not started"):
@@ -28,7 +33,7 @@ class PlannerService:
 
         try:
             response = self.client.chat.completions.create(
-                model="gpt-4o",
+                model=settings.MODEL_FAST,
                 messages=[
                     {"role": "system", "content": system_prompt},
                     {"role": "user", "content": user_prompt}
