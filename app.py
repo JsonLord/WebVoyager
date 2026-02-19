@@ -231,7 +231,7 @@ with gr.Blocks() as iface:
     submit_btn.click(
         run_script_for_gradio,
         inputs=[url_input, task_input, criteria_input],
-        outputs=[screenshot_output, agent_output, debug_output, raw_log_status]
+        outputs=[screenshot_output, agent_output, debug_output, raw_log_status], api_name="execute_task"
     )
 
 # Mount Gradio to FastAPI

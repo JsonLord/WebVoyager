@@ -1,5 +1,5 @@
 ---
-title: TinyTroupe Alpha
+title: Web-Agent-Internal
 emoji: 🚀
 colorFrom: blue
 colorTo: purple
