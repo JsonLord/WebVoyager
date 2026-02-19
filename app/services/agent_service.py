@@ -7,6 +7,7 @@ from app.core.config import settings
 from app.services.browser_service import browser_service
 from app.services.scraper_service import scraper_service
 from app.services.planner_service import planner_service
+from app.services.vision_service import vision_service
 from app.utils.mcp_tools import WEB_AGENT_TOOLS
 
 class AgentService:
@@ -38,14 +39,26 @@ class AgentService:
 
         max_iterations = 10
         for i in range(max_iterations):
-            # Observe state
+            # Observe state: textual components
             rects, web_eles, web_text = browser_service.get_web_elements(session_id)
 
-            # Prepare observation message
-            obs_msg = f"Current URL: {driver.current_url}\nVisible Elements:\n{web_text}"
+            # Observe state: visual description via Florence-2
+            screenshot_path = f"screenshots/{session_id}_step_{i}.png"
+            os.makedirs("screenshots", exist_ok=True)
+            browser_service.capture_screenshot(session_id, screenshot_path)
+
+            # This call might be slow, so we wait
+            visual_description = await vision_service.describe_screenshot(screenshot_path)
+
+            # Prepare combined observation message
+            obs_msg = (
+                f"Current URL: {driver.current_url}\n"
+                f"Visual Analysis (Florence-2): {visual_description}\n"
+                f"Visible Interactive Elements:\n{web_text}"
+            )
             history.append({"role": "user", "content": obs_msg})
 
-            # Call LLM
+            # Call LLM (Blablador)
             try:
                 response = self.client.chat.completions.create(
                     model=settings.MODEL_LARGE,
