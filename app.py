@@ -17,7 +17,7 @@ import logging
 from gradio_logsview import LogsView
 
 # Set up FastAPI for health checks
-app = FastAPI()
+from app.main import app
 
 @app.get("/health")
 def health():
