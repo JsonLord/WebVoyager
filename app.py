@@ -1,3 +1,4 @@
+from app.core.config import settings
 import gradio as gr
 from fastapi import FastAPI
 import argparse
@@ -17,7 +18,7 @@ import logging
 from gradio_logsview import LogsView
 
 # Set up FastAPI for health checks
-app = FastAPI()
+from app.main import app
 
 @app.get("/health")
 def health():
@@ -68,7 +69,7 @@ def format_log_for_gradio(log_content):
     return formatted_output
 
 
-def run_script_for_gradio(url, task, persona_criteria=None):
+def run_script_for_gradio(url, task, use_persona, persona_criteria=None):
     """
     A wrapper to run the webvoyager script for Gradio, capturing output and screenshots.
     """
@@ -82,7 +83,7 @@ def run_script_for_gradio(url, task, persona_criteria=None):
             max_iter=5,
             api_key=os.environ.get("BLABLADOR_API_KEY"),
             api_base_url="https://api.helmholtz-blablador.fz-juelich.de/v1",
-            api_model="alias-fast",
+            api_model=settings.MODEL_LARGE,
             output_dir=os.path.join(temp_dir, 'results'),
             seed=None,
             max_attached_imgs=1,
@@ -116,6 +117,7 @@ def run_script_for_gradio(url, task, persona_criteria=None):
             f.write("")
 
         persona = None
+        if not use_persona: persona_criteria = None
         if persona_criteria:
             full_log += "--- Initializing TinyTroupe Persona ---\n"
             yield last_screenshot_html, full_log, debug_log, "--- Initializing TinyTroupe Persona ---"
@@ -216,6 +218,7 @@ with gr.Blocks() as iface:
             url_input = gr.Textbox(label="URL", placeholder="Enter the URL of the website")
             task_input = gr.Textbox(label="Task", placeholder="Describe the task to perform")
             criteria_input = gr.Textbox(label="Persona Criteria (TinyTroupe)", placeholder="Describe the persona you want (e.g. salesman for CRM)")
+            use_persona_toggle = gr.Checkbox(label="Use Persona", value=True)
             submit_btn = gr.Button("Submit")
 
         with gr.Column():
@@ -230,8 +233,8 @@ with gr.Blocks() as iface:
 
     submit_btn.click(
         run_script_for_gradio,
-        inputs=[url_input, task_input, criteria_input],
-        outputs=[screenshot_output, agent_output, debug_output, raw_log_status]
+        inputs=[url_input, task_input, use_persona_toggle, criteria_input],
+        outputs=[screenshot_output, agent_output, debug_output, raw_log_status], api_name="execute_task"
     )
 
 # Mount Gradio to FastAPI

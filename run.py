@@ -1,3 +1,4 @@
+from app.core.config import settings
 import platform
 import argparse
 import time
@@ -92,13 +93,13 @@ def call_gpt4v_api(args, client_blablador, client_openai, messages):
         try:
             if not args.text_only:
                 logging.info('Calling gpt4v API...')
-                openai_response = client_openai.chat.completions.create(
-                    model="gpt-4-turbo", messages=messages, max_tokens=1000, seed=args.seed
+                openai_response = client_blablador.chat.completions.create(
+                    model=settings.MODEL_LARGE, messages=messages, max_tokens=1000, seed=args.seed
                 )
             else:
                 logging.info('Calling gpt4 API...')
                 openai_response = client_blablador.chat.completions.create(
-                    model='alias-large', messages=messages, max_tokens=1000, seed=args.seed, timeout=30
+                    model=settings.MODEL_LARGE, messages=messages, max_tokens=1000, seed=args.seed, timeout=30
                 )
 
             prompt_tokens = openai_response.usage.prompt_tokens
@@ -270,7 +271,9 @@ def webvoyager_run(args, task, task_dir, persona=None):
     A generator function that yields log messages for each step of the WebVoyager run.
     """
     client_blablador = OpenAI(api_key=args.api_key, base_url=args.api_base_url, http_client=httpx.Client(trust_env=False))
-    client_openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), http_client=httpx.Client(trust_env=False))
+    client_openai = None
+    if os.environ.get("OPENAI_API_KEY"):
+        client_openai = OpenAI(api_key=os.environ.get("OPENAI_API_KEY"), http_client=httpx.Client(trust_env=False))
     options = driver_config(args)
     setup_logger(task_dir)
     

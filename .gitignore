@@ -1,0 +1,7 @@
+__pycache__/
+*.py[cod]
+*.class
+sessions_data/
+screenshots/
+external_repos/
+.pytest_cache/
